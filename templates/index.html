@@ -156,6 +156,49 @@
                 alert('Failed to change maze');
             }
         }
+
+        async function solve(algo) {
+    const res = await fetch('/solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ algo: algo })
+    });
+    const data = await res.json();
+    const path = data.path;
+    const explored = data.explored;
+    const algorithm = data.algo;
+
+    resetMaze();
+
+    // tandai start & end
+    table.rows[0].cells[0].classList.add('start');
+    table.rows[7].cells[7].classList.add('end');
+
+    const delay = parseInt(speedSlider.value);
+
+    for (let i = 0; i < explored.length; i++) {
+        const [x, y] = explored[i];
+        if ((x === 0 && y === 0) || (x === 7 && y === 7)) continue;
+        table.rows[x].cells[y].classList.add('explored');
+        await sleep(delay);
+    }
+
+    if (path.length > 0) {
+        // ketemu goal
+        await sleep(delay * 2);
+        for (let i = 0; i < path.length; i++) {
+            const [x, y] = path[i];
+            if ((x === 0 && y === 0) || (x === 7 && y === 7)) continue;
+            table.rows[x].cells[y].classList.add('final-path');
+            await sleep(delay);
+        }
+        alert(`Goal ditemukan dengan ${algorithm.toUpperCase()}!`);
+    } else {
+        // tidak ada jalur ke goal
+        alert(`Tidak ada jalur ke goal dengan ${algorithm.toUpperCase()}.`);
+    }
+}
+
     </script>
 </body>
 
