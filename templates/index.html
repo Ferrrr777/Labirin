@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labirin 8x8 BFS & DFS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Labirin 8x8 BFS & DFS</h1>
+
+        <div class="controls">
+            <button onclick="solve('bfs')">BFS</button>
+            <button onclick="solve('dfs')">DFS</button>
+            <button onclick="resetMaze()">Reset</button>
+            <div class="speed-control">
+                <label for="speed-slider">Speed:</label>
+                <input type="range" id="speed-slider" min="50" max="1000" value="100" step="50">
+                <span id="speed-value">100ms</span>
+            </div>
+            <div class="maze-selector">
+                <label for="maze-select">Maze:</label>
+                <select id="maze-select">
+                    <option value="maze1">Maze 1</option>
+                    <option value="maze2">Maze 2</option>
+                    <option value="maze3">Maze 3</option>
+                </select>
+                <button onclick="changeMaze()">Change Maze</button>
+            </div>
+        </div>
+
+        <table id="maze-table"></table>
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color start"></div><span>Start</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color end"></div><span>Goal</span>
+            </div>
+
+            <div class="legend-item">
+                <div class="legend-color wall"></div><span>Wall</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color explored"></div><span>Explored</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color final-path"></div><span>Final Path</span>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Kirim Python maze ke JS
+        const maze = JSON.parse('{{ maze|tojson }}');
+        const table = document.getElementById('maze-table');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+
+        // Update speed value display
+        speedSlider.addEventListener('input', function () {
+            speedValue.textContent = this.value + 'ms';
+        });
+
+        // buat table HTML dari maze
+        function drawMaze() {
+            table.innerHTML = '';
+            for (let i = 0; i < maze.length; i++) {
+                const row = table.insertRow();
+                for (let j = 0; j < maze[i].length; j++) {
+                    const cell = row.insertCell();
+                    if (maze[i][j] === 1) {
+                        cell.classList.add('wall');
+                    }
+                }
+            }
+        }
+
+        drawMaze();
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function solve(algo) {
+            const res = await fetch('/solve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ algo: algo })
+            });
+            const data = await res.json();
+            const path = data.path;
+            const explored = data.explored;
+            const algorithm = data.algo;
+
+            resetMaze();
+
+            // tandai start & end
+            table.rows[0].cells[0].classList.add('start');
+            table.rows[7].cells[7].classList.add('end');
+
+            const delay = parseInt(speedSlider.value);
+
+            // Warna kuning untuk sel yang sedang dieksplorasi: Tetap menggunakan kelas 'explored' (#ffeb3b). tambahkan jalur animasi di setiap yang di kunjungi per sel. pastikan mulai dari 0,0
+            for (let i = 0; i < explored.length; i++) {
+                const [x, y] = explored[i];
+                if ((x === 0 && y === 0) || (x === 7 && y === 7)) continue; // skip start dan goal
+                table.rows[x].cells[y].classList.add('explored');
+                await sleep(delay);
+            }
+
+            // ketika sudah ketemu goal, tampilkan final path dengan warna hijau (di atas warna kuning)
+            await sleep(delay * 2); // jeda sebelum menampilkan final path
+            for (let i = 0; i < path.length; i++) {
+                const [x, y] = path[i];
+                if ((x === 0 && y === 0) || (x === 7 && y === 7)) continue;
+                // tambahkan final-path di atas explored (tidak remove explored)
+                table.rows[x].cells[y].classList.add('final-path');
+                await sleep(delay);
+            }
+        }
+
+        function resetMaze() {
+            for (let i = 0; i < maze.length; i++) {
+                for (let j = 0; j < maze[i].length; j++) {
+                    const cell = table.rows[i].cells[j];
+                    cell.className = '';
+                    if (maze[i][j] === 1) cell.classList.add('wall');
+                }
+            }
+        }
+
+        async function changeMaze() {
+            const mazeSelect = document.getElementById('maze-select');
+            const selectedMaze = mazeSelect.value;
+
+            const res = await fetch('/change_maze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ maze: selectedMaze })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                // Update the maze variable and redraw
+                maze.length = 0;
+                maze.push(...data.maze);
+                drawMaze();
+            } else {
+                alert('Failed to change maze');
+            }
+        }
+    </script>
+</body>
+
+</html>
